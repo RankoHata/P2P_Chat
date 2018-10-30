@@ -14,10 +14,16 @@ class Server(object):
         self.handlers = {
             REGISTER: self.register,
             LISTPEER: self.listpeer,
+            EXIT_NETWORK: self.exit_network,
         }
 
     def add_handler(self, signal, func):
         self.handlers[signal] = func
+
+    def exit_network(self, msgdata):
+        peername = msgdata['peername']
+        if peername in self.peerlist:
+            del self.peerlist[peername]
 
     def register(self, msgdata):
         peername = msgdata['peername']

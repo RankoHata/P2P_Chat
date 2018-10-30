@@ -24,6 +24,7 @@ class Client(object):
             REGISTER_ERROR: self.register_error,
             LISTPEER: self.display_all_peers,
         }
+        self.agree = None
         self.message_format = '{peername}: {message}'
     
     def register_success(self, msgdata):
@@ -48,6 +49,7 @@ class Client(object):
         peername = msgdata['peername']
         host = msgdata['host']
         port = msgdata['port']
+        print('chat accept: {} --- {}:{}'.format(peername, host, port))
         self.peerlist[peername] = (host, port)  # 会覆盖之间连接的重名的
     
     def chat_refuse(self, msgdata):
@@ -56,8 +58,11 @@ class Client(object):
     def chat_request(self, msgdata):
         peername = msgdata['peername']
         host, port = msgdata['host'], msgdata['port']
-        opinion = input()
-        if opinion[0] == 'y':
+        print('chat_request: {} --- {}:{}'.format(peername, host, port))
+        while self.agree is None:
+            time.sleep(0.1)
+        if self.agree is True:
+            self.agree = None
             data = {
                 'peername': self.name,
                 'host': self.serverhost,
@@ -80,13 +85,17 @@ class Client(object):
         data = {'peername': self.name}
         socket_send(self.server_info, msgtype=LISTPEER, msgdata=data)    
     
+    def send_exit_network(self):
+        data = {'peername': self.name}
+        socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
+    
     def send_chat_request(self, host, port):
         data = {
             'peername': self.name,
             'host': self.serverhost,
             'port': self.serverport
         }
-        socket_send((host, port), msgtype=CHAT_REFUSE, msgdata=data)
+        socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
     
     def send_chat_message(self, peername, message):
         data = {
@@ -94,6 +103,10 @@ class Client(object):
             'message': message
         }
         socket_send(self.peerlist[peername], msgtype=CHAT_MESSAGE, msgdata=data)
+    
+    def list_connected_peer(self):
+        for peername, peer_info in self.peerlist.items():
+            print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
     
     def classifier(self, msg):
         type_ = msg['msgtype']
@@ -144,5 +157,11 @@ if __name__ == '__main__':
                 pass
             else:
                 client.send_chat_message(peername, message)
-
-        
+        elif cmd == 'list connected peer':
+            client.list_connected_peer()
+        elif cmd == 'exit network':
+            client.send_exit_network()
+        elif cmd == 'yes':
+            client.agree = True
+        elif cmd == 'exit':
+            exit(1)
