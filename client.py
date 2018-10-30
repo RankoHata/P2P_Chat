@@ -11,10 +11,10 @@ class Client(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((serverhost, serverport))
         self.socket.listen(100)
-        self.server_info = server_info
+        self.server_info = server_info  # 服务器的地址
         self.serverhost, self.serverport = serverhost, serverport
         self.name = peername if peername is not None else ':'.join((serverhost, serverport))
-        self.peerlist = {}
+        self.peerlist = {}  # 与该client连接的Peer
         self.handlers = {
             CHAT_MESSAGE: self.recv_message,
             CHAT_ACCEPT: self.chat_accept,
@@ -126,18 +126,9 @@ class Client(object):
             self.classifier(msg)
 
 
-def socket_send(address, msgtype, msgdata):
-    msg = {'msgtype': msgtype, 'msgdata': msgdata}
-    msg = json.dumps(msg).encode('utf-8')
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(address)
-    s.send(msg)
-    s.close()
-
-
 if __name__ == '__main__':
-    serverport = int(input())
-    peername = input()
+    serverport = int(input('serverport: '))
+    peername = input('Your name: ')
     client = Client(peername=peername, serverport=serverport)
     t = threading.Thread(target=client.recv)
     t.setDaemon(True)

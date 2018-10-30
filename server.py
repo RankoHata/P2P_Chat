@@ -1,6 +1,5 @@
 import socket
 import json
-import time
 
 from base import *
 
@@ -10,7 +9,7 @@ class Server(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((serverhost, serverport))
         self.socket.listen(100)
-        self.peerlist = {}
+        self.peerlist = {}  # 所有已注册的Peer
         self.handlers = {
             REGISTER: self.register,
             LISTPEER: self.listpeer,
@@ -29,7 +28,7 @@ class Server(object):
         peername = msgdata['peername']
         host = msgdata['host']
         port = msgdata['port']
-        if peername in self.peerlist:
+        if peername in self.peerlist:  # 名字重复了，拒绝注册
             socket_send((host, port), msgtype=REGISTER_ERROR, msgdata={})
         else:
             self.peerlist[peername] = (host, port)
@@ -47,20 +46,11 @@ class Server(object):
         self.handlers[type_](data_)
 
     def recv(self):
-        while True:
-            conn, addr = self.socket.accept()          
+        while True:  # 超过缓冲区大小的，就会丢失信息
+            conn, addr = self.socket.accept()  
             buf = conn.recv(1024)
             msg = json.loads(buf.decode('utf-8'))
             self.classifier(msg)
-
-
-def socket_send(address, msgtype, msgdata):
-    msg = {'msgtype': msgtype, 'msgdata': msgdata}
-    msg = json.dumps(msg).encode('utf-8')
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(address)
-    s.send(msg)
-    s.close()
 
 
 if __name__ == '__main__':
