@@ -90,13 +90,17 @@ class Client(object):
         data = {'peername': self.name}
         socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
     
-    def send_chat_request(self, host, port):
-        data = {
-            'peername': self.name,
-            'host': self.serverhost,
-            'port': self.serverport
-        }
-        socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
+    def send_chat_request(self, host, port):  # 不向服务器注册，也能直接通过host, port连接
+        info = (host, port)
+        if info not in self.peerlist.values():
+            data = {
+                'peername': self.name,
+                'host': self.serverhost,
+                'port': self.serverport
+            }
+            socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
+        else:
+            print('You have already connected to {}:{}.'.format(host, port))
     
     def send_chat_message(self, peername, message):
         data = {
