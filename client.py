@@ -70,7 +70,8 @@ class Client(object):
             }
             socket_send((host, port), msgtype=CHAT_ACCEPT, msgdata=data)
             self.peerlist[peername] = (host, port)
-        else:
+        elif self.agree is False:
+            self.agree = None
             socket_send((host, port), msgtype=CHAT_REFUSE, msgdata={})
     
     def send_register(self):
@@ -163,5 +164,7 @@ if __name__ == '__main__':
             client.send_exit_network()
         elif cmd == 'yes':
             client.agree = True
+        elif cmd == 'no':
+            client.agree = False
         elif cmd == 'exit':
             exit(1)
