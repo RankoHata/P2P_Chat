@@ -2,6 +2,8 @@ import socket
 import json
 import threading
 import time
+import sys
+import atexit
 
 from base import *
 
@@ -24,13 +26,10 @@ class Client(object):
             REGISTER_ERROR: self.register_error,
             LISTPEER: self.display_all_peers,
         }
-        self.input_mapping = {
+        self.static_input_mapping = {
             'register': self.send_register,
             'listpeer': self.send_listpeer,
             'exit network': self.send_exit_network,
-            
-            'chat request': self.input_chat_request, 
-            'chat message': self.input_chat_message,
 
             'list connected peer': self.list_connected_peer,
 
@@ -41,9 +40,13 @@ class Client(object):
 
             'exit': self.system_exit
         }
+        self.dynamic_input_mapping = {  # 因为通过字符串首部匹配，映射中不能出现包含关系
+            'chat request': self.input_chat_request, 
+            'chat message': self.input_chat_message,
+        }
         self.agree = None  # 是否同意chat request
         self.message_format = '{peername}: {message}'
-        self.input_prompt_format = '    {cmd:<20} {prompt}'
+        self.input_prompt_format = '    {cmd:<35} {prompt}'
 
     def register_success(self, msgdata):
         print('Register Successful.')
@@ -53,7 +56,7 @@ class Client(object):
     
     def display_all_peers(self, msgdata):  # Only print, not save.
         print('display all peers:')
-        print(msgdata['peerlist'])
+        # print(msgdata['peerlist'])
         for peername, peer_info in msgdata['peerlist'].items():
             print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
 
@@ -123,12 +126,17 @@ class Client(object):
             print('You have already connected to {}:{}.'.format(host, port))
     
     def send_chat_message(self, peername, message):
-        data = {
-            'peername': self.name,
-            'message': message
-        }
-        socket_send(self.peerlist[peername], msgtype=CHAT_MESSAGE, msgdata=data)
-    
+        try:
+            peer_info = self.peerlist[peername]
+        except KeyError:
+            print('chat message: Arguments Error.')
+        else:
+            data = {
+                'peername': self.name,
+                'message': message
+            }
+            socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
+        
     def list_connected_peer(self):
         for peername, peer_info in self.peerlist.items():
             print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
@@ -145,21 +153,20 @@ class Client(object):
             msg = json.loads(buf.decode('utf-8'))
             self.classifier(msg)
 
-    def input_chat_request(self):
+    def input_chat_request(self, cmd):
         try:
-            host = input('>> Please enter host: ', end='')
-            port = int(input('>> Please enter port: ', end=''))
-        except:
-            pass
+            host, port = cmd.split(' ', maxsplit=3)[-2:]
+            port = int(port)  # May throw an ValueError exception.
+        except (IndexError, ValueError):
+            print('chat request: Arguments Error.')
         else:
-            self.send_chat_message(host, port)
+            self.send_chat_request(host, int(port))
     
-    def input_chat_message(self):
+    def input_chat_message(self, cmd):
         try:
-            peername = input('>> Please enter peer name: ', end='')
-            message = input('>> Please enter message: ', end='')
-        except:
-            pass
+            peername, message = cmd.split(' ', maxsplit=3)[-2:]
+        except IndexError:
+            print('chat message: Arguments Error.')
         else:
             self.send_chat_message(peername, message)
 
@@ -169,16 +176,17 @@ class Client(object):
     def refuse_chat_request(self):
         self.agree = False
     
-    def system_exit(self):
-        exit(1)
+    def system_exit(self):  # 若非正常退出，则无法退出网络
+        self.send_exit_network()  # 结束程序之前，退出P2P网络，由于程序没有注册flag，所以不论是否注册，都会发送
+        sys.exit()
     
     def input_prompt(self):
         print('command list:')
         print(self.input_prompt_format.format(cmd='register', prompt='注册'))
         print(self.input_prompt_format.format(cmd='listpeer', prompt='查看P2P网络内所有Peer'))
         print(self.input_prompt_format.format(cmd='exit network', prompt='退出P2P网络'))
-        print(self.input_prompt_format.format(cmd='chat request', prompt='发出聊天请求'))
-        print(self.input_prompt_format.format(cmd='chat message', prompt='发送聊天消息'))
+        print(self.input_prompt_format.format(cmd='chat request [host] [port]', prompt='发出聊天请求'))
+        print(self.input_prompt_format.format(cmd='chat message [peername] [message]', prompt='发送聊天消息'))
         print(self.input_prompt_format.format(cmd='list connected peer', prompt='查看已连接Peer'))
         print(self.input_prompt_format.format(cmd='help', prompt='查看帮助'))
         print(self.input_prompt_format.format(cmd='exit', prompt='退出程序'))
@@ -186,17 +194,25 @@ class Client(object):
     def main(self):
         self.input_prompt()
         while True:
-            cmd = input('>> ').strip()
-            if cmd in self.input_mapping:
-                self.input_mapping[cmd]()
+            cmd = input().strip()
+            if cmd in self.static_input_mapping:
+                self.static_input_mapping[cmd]()
             else:
-                print('Please enter correct command.')
-                self.input_prompt()
+                flag = False
+                for keyword in self.dynamic_input_mapping:
+                    if cmd.startswith(keyword):
+                        flag = True
+                        self.dynamic_input_mapping[keyword](cmd)
+                        break
+                if flag is False:
+                    print('Please enter correct command.')
+                    self.input_prompt()
 
 if __name__ == '__main__':
-    serverport = int(input('>> serverport: '))
-    peername = input('>> Your name: ')
+    serverport = int(input('serverport: '))
+    peername = input('Your name: ')
     client = Client(peername=peername, serverport=serverport)
+    atexit.register(client.system_exit)  # 防止程序意外中断，不能执行系统退出
     t = threading.Thread(target=client.recv)  # 作为子线程启动
     t.setDaemon(True)
     t.start()

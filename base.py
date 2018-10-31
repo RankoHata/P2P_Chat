@@ -56,7 +56,7 @@ def socket_send(address, msgtype, msgdata):
     try:
         s.connect(address)
     except ConnectionRefusedError:
-        print('连接出错: 检查服务器是否开启')
+        print('连接出错: 请确认对方已开启')
         raise
     else:
         s.send(msg)
