@@ -25,6 +25,7 @@ class Client(object):
             REGISTER_SUCCESS: self.register_success,
             REGISTER_ERROR: self.register_error,
             LISTPEER: self.display_all_peers,
+            DISCONNECT: self.disconnect,
         }
         self.static_input_mapping = {
             'register': self.send_register,
@@ -37,16 +38,23 @@ class Client(object):
             'no': self.refuse_chat_request,
 
             'help': self.input_prompt,
-
-            'exit': self.system_exit
+            
+            'exit': self.system_exit,
         }
         self.dynamic_input_mapping = {  # 因为通过字符串首部匹配，映射中不能出现包含关系
             'chat request': self.input_chat_request, 
             'chat message': self.input_chat_message,
+            'disconnect': self.input_disconnect,
         }
         self.agree = None  # 是否同意chat request
         self.message_format = '{peername}: {message}'
         self.input_prompt_format = '    {cmd:<35} {prompt}'
+
+    def disconnect(self, msgdata):
+        peername = msgdata['peername']
+        if peername in self.peerlist:
+            print('Disconnected from {}'.format(peername))
+            del self.peerlist[peername]
 
     def register_success(self, msgdata):
         print('Register Successful.')
@@ -129,14 +137,24 @@ class Client(object):
         try:
             peer_info = self.peerlist[peername]
         except KeyError:
-            print('chat message: Arguments Error.')
+            print('chat message: Peer does not exist.')
         else:
             data = {
                 'peername': self.name,
                 'message': message
             }
             socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
+    
+    def send_disconnect(self, peername):
+        try:
+            peer_info = self.peerlist[peername]
+        except KeyError:
+            print('disconnect: Peer does not exist.')
+        else:
+            data = {'peername': self.name}
+            socket_send(peer_info, msgtype=DISCONNECT, msgdata=data)
         
+
     def list_connected_peer(self):
         for peername, peer_info in self.peerlist.items():
             print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
@@ -169,6 +187,16 @@ class Client(object):
             print('chat message: Arguments Error.')
         else:
             self.send_chat_message(peername, message)
+    
+    def input_disconnect(self, cmd):
+        try:
+            peername = cmd.split(' ', maxsplit=1)[-1]
+        except IndexError:
+            print('disconnect: Arguments Error.')
+        else:
+            self.send_disconnect(peername)
+            if peername in self.peerlist:
+                del self.peerlist[peername]
 
     def accept_chat_request(self):
         self.agree = True
@@ -177,6 +205,8 @@ class Client(object):
         self.agree = False
     
     def system_exit(self):  # 若非正常退出，则无法退出网络
+        for peername in self.peerlist:  # 断开已连接的Peer
+            self.send_disconnect(peername)
         self.send_exit_network()  # 结束程序之前，退出P2P网络，由于程序没有注册flag，所以不论是否注册，都会发送
         sys.exit()
     
@@ -189,6 +219,7 @@ class Client(object):
         print(self.input_prompt_format.format(cmd='chat message [peername] [message]', prompt='发送聊天消息'))
         print(self.input_prompt_format.format(cmd='list connected peer', prompt='查看已连接Peer'))
         print(self.input_prompt_format.format(cmd='help', prompt='查看帮助'))
+        print(self.input_prompt_format.format(cmd='disconnect', prompt='断开与Peer的连接'))
         print(self.input_prompt_format.format(cmd='exit', prompt='退出程序'))
 
     def main(self):

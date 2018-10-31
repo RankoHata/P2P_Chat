@@ -28,6 +28,10 @@ LISTPEER = 'LISTPEER'
 # -------------------------------------------------
 # Signal: client and client
 
+# 断开与已连接的Peer的连接
+# (client A -> client B) or (client B -> client A)
+DISCONNECT = 'DISCONNECT'
+
 # 聊天请求
 # client A -> client B
 CHAT_REQUEST = 'CHAT_REQUEST'
