@@ -47,11 +47,18 @@ CHAT_MESSAGE = 'CHAT_MESSAGE'
 # --------------------------------------------------
 # Base function
 
+
 def socket_send(address, msgtype, msgdata):
     """ Send JSON serialized data over a new TCP connection. """
     msg = {'msgtype': msgtype, 'msgdata': msgdata}
     msg = json.dumps(msg).encode('utf-8')
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(address)
-    s.send(msg)
-    s.close()
+    try:
+        s.connect(address)
+    except ConnectionRefusedError:
+        print('连接出错: 检查服务器是否开启')
+        raise
+    else:
+        s.send(msg)
+    finally:
+        s.close()

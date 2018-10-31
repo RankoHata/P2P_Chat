@@ -3,7 +3,7 @@ import json
 
 from base import *
 
-
+# 不接受任何输入，可以把信息放到日志文件里
 class Server(object):
     def __init__(self, serverhost='localhost', serverport=30000):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
