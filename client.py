@@ -1,14 +1,31 @@
+""" Client implementation of P2P chat system. """
+
 import socket
 import json
 import threading
 import time
 import sys
-import atexit
+import atexit  # 仍无法解决系统非正常退出
 
 from base import *
 
 # 没有任何防护，通过设置peername，可以冒充任何人
 class Client(object):
+    """ CLient implementation of P2P chat system.
+
+    Args:    
+        - peername:     str                 Peer's name
+        - serverhost:   str                 IP
+        - serverport:   int                 The port occupied by the TCP socket receiving the message.
+        - server_info:  tuple or list       IP and socket port of the server in the P2P network.
+    
+    Attributes:
+        - peerlist:                 dict        All connected peer: {Peer's name: (Peer's ip, Peer's socket port)}
+        - handlers:                 dict        {Received message type: The method of processing recvived messages}
+        - static_input_mapping:     dict        {Command line arguments that have benn fixed: The method of processing arguments}    
+        - dynamic_input_mapping:    dict        {Variable command line arguments: The method of processing arguments}
+        - agree:                    variable    three values signal: None: waiting for input; True: accept chat request; False: Refuse chat request.
+    """
     def __init__(self, peername=None, serverhost='localhost', serverport=40000, server_info=('localhost', 30000)):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((serverhost, serverport))
@@ -16,6 +33,7 @@ class Client(object):
         self.server_info = server_info  # 服务器的地址
         self.serverhost, self.serverport = serverhost, serverport
         self.name = peername if peername is not None else ':'.join((serverhost, serverport))
+        # example name: 192.168.0.1:30000
         self.peerlist = {}  # 与该client连接的Peer
         self.handlers = {
             CHAT_MESSAGE: self.recv_message,
@@ -51,30 +69,41 @@ class Client(object):
         self.input_prompt_format = '    {cmd:<35} {prompt}'
 
     def disconnect(self, msgdata):
+        """ Processing received messages from peer:
+            Disconnect from the peer. """
         peername = msgdata['peername']
         if peername in self.peerlist:
             print('Disconnected from {}'.format(peername))
             del self.peerlist[peername]
 
     def register_success(self, msgdata):
+        """ Processing received message from server:
+            Successful registration on the server. """
         print('Register Successful.')
     
     def register_error(self, msgdata):
+        """ Processing received message from server:
+            Registration failed on the server. """
         print('Register Error.')
     
     def display_all_peers(self, msgdata):  # Only print, not save.
+        """ Processing received message from server:
+            Output information about all peers that have been registered on the server. """
         print('display all peers:')
         # print(msgdata['peerlist'])
         for peername, peer_info in msgdata['peerlist'].items():
             print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
 
     def recv_message(self, msgdata):
+        """ Processing received chat message from peer."""
         peername = msgdata['peername']
         if peername in self.peerlist:
             print(self.message_format.format(peername=peername, message=msgdata['message']))
             # return self.message_format.format(peername=peername, message=msgdata['message'])
     
     def chat_accept(self, msgdata):
+        """ Processing received accept chat request message from peer.
+            Add the peer to collection of connected peers. """
         peername = msgdata['peername']
         host = msgdata['host']
         port = msgdata['port']
@@ -82,14 +111,16 @@ class Client(object):
         self.peerlist[peername] = (host, port)  # 会覆盖之间连接的重名的
     
     def chat_refuse(self, msgdata):
+        """ Processing received refuse chat request message from peer. """
         print('CHAT REFUSE!')
     
     def chat_request(self, msgdata):
+        """ Processing received chat request message from peer. """
         peername = msgdata['peername']
         host, port = msgdata['host'], msgdata['port']
         print('chat_request: {} --- {}:{}'.format(peername, host, port))
         print('Please enter "yes" or "no":')
-        # Bug: 之前随意输入的 'yes' or 'no' 会影响后面的判断，实际上该变量与chat request 并无实际关联
+        # Bug: 之前随意输入的 'yes' or 'no' 会影响后面的判断，实际上该变量与何时收到 chat request 并无实际关联
         while self.agree is None:  # 通过该变量判断命令行输入，最后将其还原
             time.sleep(0.1)
         if self.agree is True:
@@ -106,6 +137,7 @@ class Client(object):
             socket_send((host, port), msgtype=CHAT_REFUSE, msgdata={})
     
     def send_register(self):
+        """ Send a request to server to register peer's information. """
         data = {
             'peername': self.name,
             'host': self.serverhost,
@@ -114,14 +146,17 @@ class Client(object):
         socket_send(self.server_info, msgtype=REGISTER, msgdata=data)
 
     def send_listpeer(self):
+        """ Send a request to server to get all peers information. """
         data = {'peername': self.name}
         socket_send(self.server_info, msgtype=LISTPEER, msgdata=data)    
     
     def send_exit_network(self):
+        """ Send a request to server to quit P2P network. """
         data = {'peername': self.name}
         socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
     
     def send_chat_request(self, host, port):  # 不向服务器注册，也能直接通过host, port连接
+        """ Send a chat request to peer. """
         info = (host, port)
         if info not in self.peerlist.values():
             data = {
@@ -134,6 +169,7 @@ class Client(object):
             print('You have already connected to {}:{}.'.format(host, port))
     
     def send_chat_message(self, peername, message):
+        """ Send a chat message to peer. """
         try:
             peer_info = self.peerlist[peername]
         except KeyError:
@@ -146,6 +182,7 @@ class Client(object):
             socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
     
     def send_disconnect(self, peername):
+        """ Send a disconnect request to peer. """
         try:
             peer_info = self.peerlist[peername]
         except KeyError:
@@ -156,15 +193,18 @@ class Client(object):
         
 
     def list_connected_peer(self):
+        """ Output all connected peers information. """
         for peername, peer_info in self.peerlist.items():
             print('peername: ' + peername + '---' + peer_info[0] + ':' + str(peer_info[1]))
     
     def classifier(self, msg):
+        """ Scheduling methods. """
         type_ = msg['msgtype']
         data_ = msg['msgdata']
         self.handlers[type_](data_)
 
     def recv(self):
+        """ TCP socket that receives information. """
         while True:
             conn, addr = self.socket.accept()          
             buf = conn.recv(1024)

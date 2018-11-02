@@ -1,9 +1,10 @@
+""" All message type about P2P network. """
+
 import json
 import socket
 
-# Some Signal about P2P network.
 # --------------------------------------------------
-# Signal: client and server
+# Message type: client and server
 
 # 注册
 # client -> server
@@ -26,7 +27,7 @@ REGISTER_SUCCESS = 'REGISTER_SUCCESS'
 LISTPEER = 'LISTPEER'
 
 # -------------------------------------------------
-# Signal: client and client
+# Message type: client and client
 
 # 断开与已连接的Peer的连接
 # (client A -> client B) or (client B -> client A)
