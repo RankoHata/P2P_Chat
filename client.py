@@ -246,9 +246,20 @@ class Client(object):
     
     def system_exit(self):  # 若非正常退出，则无法退出网络
         for peername in self.peerlist:  # 断开已连接的Peer
-            self.send_disconnect(peername)
-        self.send_exit_network()  # 结束程序之前，退出P2P网络，由于程序没有注册flag，所以不论是否注册，都会发送
-        sys.exit()
+            # Note：因为某些连接异常，执行至此处，会再触发连接异常，再次触发异常之后，程序直接退出，不会再继续执行
+            try:
+                self.send_disconnect(peername)
+            except ConnectionRefusedError:
+                pass
+            except:
+                pass
+        try:
+            self.send_exit_network()  # 结束程序之前，退出P2P网络，由于程序没有注册flag，所以不论是否注册，都会发送
+        except ConnectionRefusedError:
+            pass
+        except:
+            pass
+        sys.exit()  # 使用上面的try-except保证上面不论发生什么，最后系统是执行到此语句退出的
     
     def input_prompt(self):
         print('command list:')

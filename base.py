@@ -57,6 +57,7 @@ def socket_send(address, msgtype, msgdata):
     """ Send JSON serialized data over a new TCP connection. """
     msg = {'msgtype': msgtype, 'msgdata': msgdata}
     msg = json.dumps(msg).encode('utf-8')
+    # import pdb; pdb.set_trace()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.connect(address)
