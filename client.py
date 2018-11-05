@@ -222,7 +222,7 @@ class Client(Peer):
     
     def input_chat_message(self, cmd):
         try:
-            peername, message = cmd.split(' ', maxsplit=3)[-2:]
+            peername, message = cmd.split(' ', maxsplit=3)[-2:]  # 通过限制最大切割数，避免切割报文
         except IndexError:
             print('chat message: Arguments Error.')
         else:
@@ -274,6 +274,8 @@ class Client(Peer):
         print(self.input_prompt_format.format(cmd='exit', prompt='退出程序'))
 
     def run(self):
+        atexit.register(client.system_exit)  # 防止程序意外中断，不能执行系统退出
+        
         t = threading.Thread(target=self.recv)  # 作为子线程启动
         t.setDaemon(True)
         t.start()
@@ -298,8 +300,4 @@ if __name__ == '__main__':
     serverport = int(input('serverport: '))
     peername = input('Your name: ')
     client = Client(peername=peername, serverport=serverport)
-    atexit.register(client.system_exit)  # 防止程序意外中断，不能执行系统退出
-    # t = threading.Thread(target=client.recv)  # 作为子线程启动
-    # t.setDaemon(True)
-    # t.start()
     client.run()
