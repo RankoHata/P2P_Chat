@@ -1,19 +1,20 @@
 """ Client implementation of P2P chat system. """
 
 import socket
+import sys
 import json
 import threading
 import time
-import sys
-import atexit  # 仍无法解决系统非正常退出
+import atexit  # 可以解决一般系统退出问题，仍无法解决系统非正常退出
 
-from base import *
+from base import Peer
+from config import *
 
 # 没有任何防护，通过设置peername，可以冒充任何人
-class Client(object):
+class Client(Peer):
     """ CLient implementation of P2P chat system.
 
-    Args:    
+    Args:
         - peername:     str                 Peer's name
         - serverhost:   str                 IP
         - serverport:   int                 The port occupied by the TCP socket receiving the message.
@@ -27,15 +28,11 @@ class Client(object):
         - agree:                    variable    three values signal: None: waiting for input; True: accept chat request; False: Refuse chat request.
     """
     def __init__(self, peername=None, serverhost='localhost', serverport=40000, server_info=('localhost', 30000)):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind((serverhost, serverport))
-        self.socket.listen(100)
+        super(Client, self).__init__(serverhost, serverport)
         self.server_info = server_info  # 服务器的地址
-        self.serverhost, self.serverport = serverhost, serverport
         self.name = peername if peername is not None else ':'.join((serverhost, serverport))
         # example name: 192.168.0.1:30000
-        self.peerlist = {}  # 与该client连接的Peer
-        self.handlers = {
+        handlers = {
             CHAT_MESSAGE: self.recv_message,
             CHAT_ACCEPT: self.chat_accept,
             CHAT_REFUSE: self.chat_refuse,
@@ -45,6 +42,9 @@ class Client(object):
             LISTPEER: self.display_all_peers,
             DISCONNECT: self.disconnect,
         }
+        for message_type, func in handlers.items():
+            self.add_handler(message_type, func)
+
         self.static_input_mapping = {
             'register': self.send_register,
             'listpeer': self.send_listpeer,
@@ -130,11 +130,11 @@ class Client(object):
                 'host': self.serverhost,
                 'port': self.serverport
             }
-            socket_send((host, port), msgtype=CHAT_ACCEPT, msgdata=data)
+            self.socket_send((host, port), msgtype=CHAT_ACCEPT, msgdata=data)
             self.peerlist[peername] = (host, port)
         elif self.agree is False:
             self.agree = None
-            socket_send((host, port), msgtype=CHAT_REFUSE, msgdata={})
+            self.socket_send((host, port), msgtype=CHAT_REFUSE, msgdata={})
     
     def send_register(self):
         """ Send a request to server to register peer's information. """
@@ -143,17 +143,17 @@ class Client(object):
             'host': self.serverhost,
             'port': self.serverport
         }
-        socket_send(self.server_info, msgtype=REGISTER, msgdata=data)
+        self.socket_send(self.server_info, msgtype=REGISTER, msgdata=data)
 
     def send_listpeer(self):
         """ Send a request to server to get all peers information. """
         data = {'peername': self.name}
-        socket_send(self.server_info, msgtype=LISTPEER, msgdata=data)    
+        self.socket_send(self.server_info, msgtype=LISTPEER, msgdata=data)    
     
     def send_exit_network(self):
         """ Send a request to server to quit P2P network. """
         data = {'peername': self.name}
-        socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
+        self.socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
     
     def send_chat_request(self, host, port):  # 不向服务器注册，也能直接通过host, port连接
         """ Send a chat request to peer. """
@@ -164,7 +164,7 @@ class Client(object):
                 'host': self.serverhost,
                 'port': self.serverport
             }
-            socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
+            self.socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
         else:
             print('You have already connected to {}:{}.'.format(host, port))
     
@@ -179,7 +179,7 @@ class Client(object):
                 'peername': self.name,
                 'message': message
             }
-            socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
+            self.socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
     
     def send_disconnect(self, peername):
         """ Send a disconnect request to peer. """
@@ -189,7 +189,7 @@ class Client(object):
             print('disconnect: Peer does not exist.')
         else:
             data = {'peername': self.name}
-            socket_send(peer_info, msgtype=DISCONNECT, msgdata=data)
+            self.socket_send(peer_info, msgtype=DISCONNECT, msgdata=data)
         
 
     def list_connected_peer(self):
@@ -273,7 +273,11 @@ class Client(object):
         print(self.input_prompt_format.format(cmd='disconnect', prompt='断开与Peer的连接'))
         print(self.input_prompt_format.format(cmd='exit', prompt='退出程序'))
 
-    def main(self):
+    def run(self):
+        t = threading.Thread(target=self.recv)  # 作为子线程启动
+        t.setDaemon(True)
+        t.start()
+        
         self.input_prompt()
         while True:
             cmd = input().strip()
@@ -287,7 +291,7 @@ class Client(object):
                         self.dynamic_input_mapping[keyword](cmd)
                         break
                 if flag is False:
-                    print('Please enter correct command.')
+                    print('Error! Please enter correct command.')
                     self.input_prompt()
 
 if __name__ == '__main__':
@@ -295,7 +299,7 @@ if __name__ == '__main__':
     peername = input('Your name: ')
     client = Client(peername=peername, serverport=serverport)
     atexit.register(client.system_exit)  # 防止程序意外中断，不能执行系统退出
-    t = threading.Thread(target=client.recv)  # 作为子线程启动
-    t.setDaemon(True)
-    t.start()
-    client.main()
+    # t = threading.Thread(target=client.recv)  # 作为子线程启动
+    # t.setDaemon(True)
+    # t.start()
+    client.run()
