@@ -1,8 +1,5 @@
 """ All message type about P2P network. """
 
-import json
-import socket
-
 # --------------------------------------------------
 # Message type: client and server
 
