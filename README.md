@@ -42,6 +42,18 @@ A chat application for a simple P2P network.
     
     >> exit
 
+Server:
+
+![](example/server.png)
+
+Client_a:
+
+![](example/client_a.png)
+
+Client_b:
+
+![](example/client_b.png)
+
 ## Detail implementation
 
 ### 实现P2P网络的技术选择
