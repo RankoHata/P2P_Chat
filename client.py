@@ -1,5 +1,6 @@
 """ Client implementation of P2P chat system. """
 
+import os
 import socket
 import sys
 import json
@@ -7,6 +8,7 @@ import threading
 import time
 import atexit  # 可以解决一般系统退出问题，仍无法解决系统非正常退出
 
+from math import ceil
 from base import Peer
 from config import *
 
@@ -41,6 +43,7 @@ class Client(Peer):
             REGISTER_ERROR: self.register_error,
             LISTPEER: self.display_all_peers,
             DISCONNECT: self.disconnect,
+            FILE_TRANSFER: self.file_transfer,
         }
         for message_type, func in handlers.items():
             self.add_handler(message_type, func)
@@ -63,10 +66,36 @@ class Client(Peer):
             'chat request': self.input_chat_request, 
             'chat message': self.input_chat_message,
             'disconnect': self.input_disconnect,
+            'sendfile': self.input_sendfile,
         }
         self.agree = None  # 是否同意chat request
         self.message_format = '{peername}: {message}'
         self.input_prompt_format = '    {cmd:<35} {prompt}'
+        self.file_data = {}
+
+    def file_transfer(self, msgdata):
+        peername = msgdata['peername']
+        filename = msgdata['filename']
+        filenum = int(msgdata['filenum'])
+        curnum = int(msgdata['curnum'])
+        filedata = msgdata['filedata']
+        
+        key = peername + '_' + filename
+        if self.file_data.get(key) is None:
+            self.file_data[key] = [None] * filenum
+        self.file_data[key][curnum] = filedata
+        print(self.file_data[key])
+        print(self.file_data.get(key) is None)
+
+        flag = True
+        for i in self.file_data[key]:
+            if i is None:
+                flag = False
+                break
+        if flag is True:
+            with open(key, 'at', encoding='utf-8') as f:
+                for i in self.file_data[key]:
+                    f.write(i)
 
     def disconnect(self, msgdata):
         """ Processing received messages from peer:
@@ -181,6 +210,31 @@ class Client(Peer):
             }
             self.socket_send(peer_info, msgtype=CHAT_MESSAGE, msgdata=data)
     
+    def send_file(self, peername, filename):
+        try:
+            peer_info = self.peerlist[peername]
+        except KeyError:
+            print("send file: Peer does not exist.")
+        else:
+            read_per = 128
+            tmp_text = []
+            with open(filename, 'rt', encoding='utf-8') as f:
+                while True:
+                    text_data = f.read(read_per)
+                    if not text_data:
+                        break
+                    tmp_text.append(text_data)
+            tran_num = len(tmp_text)
+            for index, item in enumerate(tmp_text):
+                data = {
+                    'peername': self.name,
+                    'filename': filename,
+                    'filenum': tran_num,
+                    'curnum': index,
+                    'filedata': item
+                }
+                self.socket_send(peer_info, msgtype=FILE_TRANSFER, msgdata=data)
+
     def send_disconnect(self, peername):
         """ Send a disconnect request to peer. """
         try:
@@ -207,7 +261,7 @@ class Client(Peer):
         """ TCP socket that receives information. """
         while True:
             conn, addr = self.socket.accept()          
-            buf = conn.recv(1024)
+            buf = conn.recv(2048)
             msg = json.loads(buf.decode('utf-8'))
             self.classifier(msg)
 
@@ -237,6 +291,14 @@ class Client(Peer):
             self.send_disconnect(peername)
             if peername in self.peerlist:
                 del self.peerlist[peername]
+
+    def input_sendfile(self, cmd):
+        try:
+            peername, filename = cmd.split(' ', maxsplit=3)[-2:]
+        except IndexError:
+            print('Error: sendfile.')
+        else:
+            self.send_file(peername, filename)
 
     def accept_chat_request(self):
         self.agree = True

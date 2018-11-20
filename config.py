@@ -45,3 +45,7 @@ CHAT_REFUSE = 'CHAT_REFUSE'
 # 聊天信息
 # (client A -> client B) or (client B -> client A)
 CHAT_MESSAGE = 'CHAT_MESSAGE'
+
+# 文件传输
+# cilent A <-> client B
+FILE_TRANSFER = 'FILE_TRANSFER'

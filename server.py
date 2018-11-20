@@ -5,6 +5,7 @@
 
 import socket
 import json
+import threading
 
 from base import Peer
 from config import *
@@ -53,7 +54,12 @@ class Server(Peer):
         self.handlers[type_](data_)
 
     def run(self):
-        self.recv()
+        t = threading.Thread(target=self.recv)
+        t.setDaemon(True)
+        t.start()
+        
+        while True:
+            cmd = input().strip()
 
 
 if __name__ == '__main__':

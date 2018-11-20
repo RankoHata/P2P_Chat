@@ -25,7 +25,7 @@ class Peer(object):
     def recv(self):
         while True:  # 超过缓冲区大小的，就会丢失信息
             conn, addr = self.socket.accept()
-            buf = conn.recv(1024)
+            buf = conn.recv(2048)
             msg = json.loads(buf.decode('utf-8'))
             self.classifier(msg)
 
