@@ -49,3 +49,15 @@ class Peer(object):
             s.send(msg)
         finally:
             s.close()
+
+
+class Symbol(object):
+    @abstractmethod
+    def send(self):
+        pass
+    
+    @abstractmethod
+    def recv(self):
+        pass
+
+    

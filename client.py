@@ -33,6 +33,7 @@ class Client(Peer):
         super(Client, self).__init__(serverhost, serverport)
         self.server_info = server_info  # 服务器的地址
         self.name = peername if peername is not None else ':'.join((serverhost, serverport))
+        self.connectable_peer = {}
         # example name: 192.168.0.1:30000
         handlers = {
             CHAT_MESSAGE: self.recv_message,
@@ -108,6 +109,7 @@ class Client(Peer):
     def register_success(self, msgdata):
         """ Processing received message from server:
             Successful registration on the server. """
+        self.send_listpeer()  # Update connectable peer table
         print('Register Successful.')
     
     def register_error(self, msgdata):
@@ -115,9 +117,10 @@ class Client(Peer):
             Registration failed on the server. """
         print('Register Error.')
     
-    def display_all_peers(self, msgdata):  # Only print, not save.
+    def display_all_peers(self, msgdata):
         """ Processing received message from server:
             Output information about all peers that have been registered on the server. """
+        self.connectable_peer = {key:tuple(value) for key, value in msgdata['peerlist'].items()}
         print('display all peers:')
         # print(msgdata['peerlist'])
         for peername, peer_info in msgdata['peerlist'].items():
@@ -184,18 +187,23 @@ class Client(Peer):
         data = {'peername': self.name}
         self.socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
     
-    def send_chat_request(self, host, port):  # 不向服务器注册，也能直接通过host, port连接
+    def send_chat_request(self, peername):  # 不向服务器注册，也能直接通过host, port连接
         """ Send a chat request to peer. """
-        info = (host, port)
-        if info not in self.peerlist.values():
-            data = {
-                'peername': self.name,
-                'host': self.serverhost,
-                'port': self.serverport
-            }
-            self.socket_send((host, port), msgtype=CHAT_REQUEST, msgdata=data)
+        if peername not in self.peerlist:
+            try:
+                server_info = self.connectable_peer[peername]
+            except KeyError:  # 如果没有更新列表，注册了也不能发送，只能先更新列表
+                # 不能在这里send_listpeer，接收分离，无法确定某个时刻是否受到，也不会像http那样阻塞
+                print('This peer ({}) is not registered.'.format(peername))
+            else:
+                data = {
+                    'peername': self.name,
+                    'host': self.serverhost,
+                    'port': self.serverport
+                }
+                self.socket_send(server_info, msgtype=CHAT_REQUEST, msgdata=data)
         else:
-            print('You have already connected to {}:{}.'.format(host, port))
+            print('You have already connected to {}.'.format(peername))
     
     def send_chat_message(self, peername, message):
         """ Send a chat message to peer. """
@@ -267,12 +275,11 @@ class Client(Peer):
 
     def input_chat_request(self, cmd):
         try:
-            host, port = cmd.split(' ', maxsplit=3)[-2:]
-            port = int(port)  # May throw an ValueError exception.
-        except (IndexError, ValueError):
+            peername = cmd.split(' ', maxsplit=2)[-1]
+        except IndexError:
             print('chat request: Arguments Error.')
         else:
-            self.send_chat_request(host, int(port))
+            self.send_chat_request(peername)
     
     def input_chat_message(self, cmd):
         try:
@@ -328,7 +335,7 @@ class Client(Peer):
         print(self.input_prompt_format.format(cmd='register', prompt='注册'))
         print(self.input_prompt_format.format(cmd='listpeer', prompt='查看P2P网络内所有Peer'))
         print(self.input_prompt_format.format(cmd='exit network', prompt='退出P2P网络'))
-        print(self.input_prompt_format.format(cmd='chat request [host] [port]', prompt='发出聊天请求'))
+        print(self.input_prompt_format.format(cmd='chat request [peername]', prompt='发出聊天请求'))
         print(self.input_prompt_format.format(cmd='chat message [peername] [message]', prompt='发送聊天消息'))
         print(self.input_prompt_format.format(cmd='list connected peer', prompt='查看已连接Peer'))
         print(self.input_prompt_format.format(cmd='help', prompt='查看帮助'))
