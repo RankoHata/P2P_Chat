@@ -39,12 +39,15 @@ class Client(Peer):
             CHAT_MESSAGE: self.recv_message,
             CHAT_ACCEPT: self.chat_accept,
             CHAT_REFUSE: self.chat_refuse,
-            CHAT_REQUEST: self.chat_request,
+            REQUEST: self.request,
             REGISTER_SUCCESS: self.register_success,
             REGISTER_ERROR: self.register_error,
             LISTPEER: self.display_all_peers,
             DISCONNECT: self.disconnect,
-            FILE_TRANSFER: self.file_transfer,
+            FILE_TRANSFER: self.file_transfer,  # 文件传输相关
+            FILE_TRANSFER_REQUEST: self.recv_file_transfer_request,
+            FILE_TRANSFER_ACCEPT: self.recv_file_transfer_accept,
+            FILE_TRANSFER_REFUSE: self.recv_file_transfer_refuse,
         }
         for message_type, func in handlers.items():
             self.add_handler(message_type, func)
@@ -56,15 +59,15 @@ class Client(Peer):
 
             'list connected peer': self.list_connected_peer,
 
-            'yes': self.accept_chat_request,
-            'no': self.refuse_chat_request,
+            'yes': self.accept_request,
+            'no': self.refuse_request,
 
             'help': self.input_prompt,
             
             'exit': self.system_exit,
         }
         self.dynamic_input_mapping = {  # 因为通过字符串首部匹配，映射中不能出现包含关系
-            'chat request': self.input_chat_request, 
+            'request': self.input_request, 
             'chat message': self.input_chat_message,
             'disconnect': self.input_disconnect,
             'sendfile': self.input_sendfile,
@@ -98,6 +101,15 @@ class Client(Peer):
                 for i in self.file_data[key]:
                     f.write(i)
 
+    def recv_file_transfer_request(self, msgdata):  # 暂未实现
+        pass
+
+    def recv_file_transfer_accept(self, msgdata):
+        pass
+    
+    def recv_file_transfer_refuse(self, msgdata):
+        pass
+    
     def disconnect(self, msgdata):
         """ Processing received messages from peer:
             Disconnect from the peer. """
@@ -146,11 +158,11 @@ class Client(Peer):
         """ Processing received refuse chat request message from peer. """
         print('CHAT REFUSE!')
     
-    def chat_request(self, msgdata):
+    def request(self, msgdata):
         """ Processing received chat request message from peer. """
         peername = msgdata['peername']
         host, port = msgdata['host'], msgdata['port']
-        print('chat_request: {} --- {}:{}'.format(peername, host, port))
+        print('request: {} --- {}:{}'.format(peername, host, port))
         print('Please enter "yes" or "no":')
         # Bug: 之前随意输入的 'yes' or 'no' 会影响后面的判断，实际上该变量与何时收到 chat request 并无实际关联
         while self.agree is None:  # 通过该变量判断命令行输入，最后将其还原
@@ -187,7 +199,7 @@ class Client(Peer):
         data = {'peername': self.name}
         self.socket_send(self.server_info, msgtype=EXIT_NETWORK, msgdata=data)
     
-    def send_chat_request(self, peername):  # 不向服务器注册，也能直接通过host, port连接
+    def send_request(self, peername):  # 不向服务器注册，也能直接通过host, port连接
         """ Send a chat request to peer. """
         if peername not in self.peerlist:
             try:
@@ -201,7 +213,7 @@ class Client(Peer):
                     'host': self.serverhost,
                     'port': self.serverport
                 }
-                self.socket_send(server_info, msgtype=CHAT_REQUEST, msgdata=data)
+                self.socket_send(server_info, msgtype=REQUEST, msgdata=data)
         else:
             print('You have already connected to {}.'.format(peername))
     
@@ -273,13 +285,13 @@ class Client(Peer):
             msg = json.loads(buf.decode('utf-8'))
             self.classifier(msg)
 
-    def input_chat_request(self, cmd):
+    def input_request(self, cmd):
         try:
             peername = cmd.split(' ', maxsplit=2)[-1]
         except IndexError:
             print('chat request: Arguments Error.')
         else:
-            self.send_chat_request(peername)
+            self.send_request(peername)
     
     def input_chat_message(self, cmd):
         try:
@@ -307,10 +319,10 @@ class Client(Peer):
         else:
             self.send_file(peername, filename)
 
-    def accept_chat_request(self):
+    def accept_request(self):
         self.agree = True
     
-    def refuse_chat_request(self):
+    def refuse_request(self):
         self.agree = False
     
     def system_exit(self):  # 若非正常退出，则无法退出网络
@@ -335,7 +347,7 @@ class Client(Peer):
         print(self.input_prompt_format.format(cmd='register', prompt='注册'))
         print(self.input_prompt_format.format(cmd='listpeer', prompt='查看P2P网络内所有Peer'))
         print(self.input_prompt_format.format(cmd='exit network', prompt='退出P2P网络'))
-        print(self.input_prompt_format.format(cmd='chat request [peername]', prompt='发出聊天请求'))
+        print(self.input_prompt_format.format(cmd='request [peername]', prompt='发出聊天请求'))
         print(self.input_prompt_format.format(cmd='chat message [peername] [message]', prompt='发送聊天消息'))
         print(self.input_prompt_format.format(cmd='list connected peer', prompt='查看已连接Peer'))
         print(self.input_prompt_format.format(cmd='help', prompt='查看帮助'))

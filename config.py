@@ -30,9 +30,9 @@ LISTPEER = 'LISTPEER'
 # (client A -> client B) or (client B -> client A)
 DISCONNECT = 'DISCONNECT'
 
-# 聊天请求
+# 连接请求
 # client A -> client B
-CHAT_REQUEST = 'CHAT_REQUEST'
+REQUEST = 'REQUEST'
 
 # 接受聊天请求
 # client B -> client A
@@ -46,6 +46,18 @@ CHAT_REFUSE = 'CHAT_REFUSE'
 # (client A -> client B) or (client B -> client A)
 CHAT_MESSAGE = 'CHAT_MESSAGE'
 
-# 文件传输
+# 文件数据传输
 # cilent A <-> client B
 FILE_TRANSFER = 'FILE_TRANSFER'
+
+# 文件传输请求
+# client A -> client B
+FILE_TRANSFER_REQUEST = 'FILE_TRANSFER_REQUEST'
+
+# 接受文件请求
+# client B -> client A
+FILE_TRANSFER_ACCEPT = 'FILE_TRANSFER_ACCEPT'
+
+# 拒绝文件请求
+# client B -> client A
+FILE_TRANSFER_REFUSE = 'FILE_TRANSFER_REFUSE'
